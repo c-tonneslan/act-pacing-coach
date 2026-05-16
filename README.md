@@ -47,17 +47,51 @@ find the question that ate your clock. This one does.
 
 ## Stack
 
-Next.js 16 (App Router), TypeScript, Tailwind v4. Question bank is a
-plain TS file in `src/data/questions.ts`. Analytics and recommendations
+Next.js 16 (App Router), TypeScript, Tailwind v4. Question bank lives
+in two files: `src/data/seed.ts` is the hand-written reference set,
+`src/data/generated.ts` is the LLM-generated extension (written by
+the pipeline below, not edited by hand). `src/data/questions.ts`
+merges them and stamps a `source` field. Analytics and recommendations
 are pure functions in `src/lib/analytics.ts`, so it's easy to extend
 with new sections (English, Reading, Science) or hook up a real eval
 later.
 
+## Growing the question bank
+
+Real ACT questions are copyrighted and ACT, Inc. is aggressive about
+reproductions, so the bank is grown the legal way: Claude generates
+new questions from a few-shot prompt seeded with the hand-written
+reference set, then a second Claude call (cheap model) independently
+re-solves each candidate and rejects ones where its answer disagrees
+with the marked correct choice.
+
+```
+export ANTHROPIC_API_KEY=...
+npm run grow
+```
+
+That runs `scripts/grow-bank.ts`, which:
+
+1. Walks `TARGETS` (topic + difficulty bucket counts in the script)
+2. For each bucket, calls Sonnet with a few-shot prompt drawn from
+   the seed bank to generate `1.5 * needed` candidates (the 50%
+   slack absorbs validator rejections)
+3. Validates each candidate with Haiku, accepting only ones where
+   the validator's independent answer matches the marked one
+4. Dedupes against seed + already-accepted prompts
+5. Writes accepted entries to `src/data/generated.ts` after each
+   bucket so a midway crash leaves usable partial output
+
+Generation uses prompt caching on the system prompt and the
+few-shot block, so the cost is mostly the per-question output
+tokens.
+
 ## What's missing
 
 - Only math. ACT has four sections, this covers one.
-- 20 questions, not 60. Half-session.
+- Per-session is a 20-question half-session, not the full 60.
 - No persistence across browsers. Single-user, local-only.
-- Question bank is hand-written, not pulled from a real test. Anyone
-  using this for serious prep should also work through actual past
-  ACT released tests.
+- Generated questions are LLM-written. Anyone using this for serious
+  prep should also work through real past ACT tests (the free
+  "Preparing for the ACT" PDFs on act.org are the right place to
+  start).

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { questions as bank } from "@/data/questions";
+import { questions as fullBank } from "@/data/questions";
+import { sampleSession } from "@/lib/sampler";
 import { saveSession, type Attempt } from "@/lib/session";
 
 // Half-session target. Real ACT math is 60 questions in 60 minutes (1 min/q
@@ -19,6 +20,10 @@ export default function PracticePage() {
   const router = useRouter();
   const startedAt = useRef(Date.now());
   const questionEnteredAt = useRef(Date.now());
+
+  // Sample once on mount so subsequent re-renders don't reshuffle. useState
+  // initializer fires exactly once on the client.
+  const [bank] = useState(() => sampleSession(fullBank));
 
   const [index, setIndex] = useState(0);
   const [attempts, setAttempts] = useState<AttemptState[]>(() =>
